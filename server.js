@@ -19,6 +19,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ১. সার্ভার সজাগ ও পিং রাখার রুট (ক্রন-জব ও ব্রাউজারের জন্য - 404 আটকাবে)
+app.get('/', (req, res) => {
+  res.status(200).send('MedKarma Server is Running Live!');
+});
+
 // সাময়িক ওটিপি স্টোর (মেমোরি)
 const otpStore = new Map();
 
@@ -31,7 +36,7 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// ১. ওটিপি পাঠানোর API
+// ২. ওটিপি পাঠানোর API
 app.post('/api/send-otp', async (req, res) => {
   const { email } = req.body;
 
@@ -45,12 +50,12 @@ app.post('/api/send-otp', async (req, res) => {
 
   otpStore.set(email, { otp, expiresAt });
 
-  // ডার্ক ব্র্যান্ডিং ও ছবির মতো কাস্টম লোগো টেমপ্লেট
+  // ক্লাউডিনারি ইমেজ লোগো সহ কাস্টম ডার্ক টেমপ্লেট
   const mailOptions = {
     from: `"MedKarma" <${process.env.EMAIL_USER}>`,
     to: email,
     subject: `${otp} is your MedKarma verification code`,
-    text: `Your MedKarma verification code is: ${otp}. Valid for 5 minutes.`,
+    text: `Your MedKarma verification code is: ${otp}. Valid for 5 minutes.`, // জিমেইল নোটিফিকেশনে "Copy code" দ্রুত আসার জন্য
     html: `
       <!DOCTYPE html>
       <html>
@@ -60,7 +65,7 @@ app.post('/api/send-otp', async (req, res) => {
       </head>
       <body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
         
-        <!-- হিডেন প্রি-হেডার টেক্সট: জিমেইলকে দ্রুত ওটিপি সনাক্ত করতে সাহায্য করে -->
+        <!-- গোপন প্রি-হেডার: জিমেইলকে দ্রুত ওটিপি ডিটেক্ট করতে সাহায্য করে -->
         <div style="display: none; font-size: 1px; color: #0f172a; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
           Your MedKarma verification code is ${otp}.
         </div>
@@ -70,16 +75,14 @@ app.post('/api/send-otp', async (req, res) => {
             <td align="center" style="padding: 40px 10px;">
               <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 500px; background-color: #0a0f1d; border-radius: 16px; border: 1px solid #1e293b; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5); overflow: hidden;">
                 
-                <!-- ছবির মতো লোগো সেকশন -->
+                <!-- Cloudinary আসল লোগো ইমেজ সেকশন -->
                 <tr>
-                  <td align="center" style="padding: 38px 20px 20px 20px; background-color: #050811;">
-                    <div style="font-size: 38px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase;">
-                      <span style="color: #FFFFFF;">MED</span><span style="color: #00BFFF;">K</span><span style="color: #2F80ED;">A</span><span style="color: #7952DE;">R</span><span style="color: #BB3BAE;">M</span><span style="color: #FF007F;">A</span>
-                    </div>
+                  <td align="center" style="padding: 35px 20px 20px 20px; background-color: #050811;">
+                    <img src="https://res.cloudinary.com/d4puny67/image/upload/f_auto/q_auto/file_000000005390821190f86576e343b442.png" alt="MedKarma" style="height: 42px; max-width: 220px; width: auto; display: block; border: 0;" />
                   </td>
                 </tr>
 
-                <!-- হেডার ও ডেসক্রিপশন -->
+                <!-- হেডার ও বর্ণনা -->
                 <tr>
                   <td style="padding: 25px 35px 15px 35px; text-align: center;">
                     <h2 style="color: #f8fafc; font-size: 20px; font-weight: 700; margin: 0 0 10px 0;">Verify your email address</h2>
@@ -140,7 +143,7 @@ app.post('/api/send-otp', async (req, res) => {
   }
 });
 
-// ২. ওটিপি যাচাই ও ফায়ারবেস কাস্টম টোকেন তৈরি
+// ৩. ওটিপি যাচাই ও ফায়ারবেস কাস্টম টোকেন তৈরি
 app.post('/api/verify-otp', async (req, res) => {
   const { email, otp } = req.body;
 
@@ -159,10 +162,11 @@ app.post('/api/verify-otp', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid OTP' });
   }
 
+  // ওটিপি ভেরিফাইড! মেমোরি থেকে মুছে ফেলা হলো
   otpStore.delete(email);
 
   try {
-    // ফায়ারবেসে ইউজার চেক অথবা নতুন তৈরি
+    // ফায়ারবেসে ইউজার আছে কি না চেক করা বা নতুন তৈরি করা
     let userRecord;
     try {
       userRecord = await admin.auth().getUserByEmail(email);
@@ -174,13 +178,13 @@ app.post('/api/verify-otp', async (req, res) => {
       }
     }
 
-    // ফায়ারবেসের কাস্টম টোকেন তৈরি
+    // ফায়ারবেসের অফিশিয়াল কাস্টম টোকেন তৈরি
     const firebaseToken = await admin.auth().createCustomToken(userRecord.uid);
 
     return res.status(200).json({
       success: true,
       message: 'Email verified successfully',
-      firebaseToken: firebaseToken
+      firebaseToken: firebaseToken // অ্যান্ড্রয়েড অ্যাপে Firebase-এ লগইন করার চাবি
     });
 
   } catch (firebaseErr) {
@@ -189,6 +193,7 @@ app.post('/api/verify-otp', async (req, res) => {
   }
 });
 
+// পোর্ট লিসেন করা
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
