@@ -19,7 +19,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ১. সার্ভার সজাগ ও পিং রাখার রুট (ক্রন-জব ও ব্রাউজারের জন্য - 404 আটকাবে)
+// ১. সার্ভার সজাগ ও পিং রাখার রুট (ক্রন-জব ও ব্রাউজারের জন্য)
 app.get('/', (req, res) => {
   res.status(200).send('MedKarma Server is Running Live!');
 });
@@ -27,16 +27,22 @@ app.get('/', (req, res) => {
 // সাময়িক ওটিপি স্টোর (মেমোরি)
 const otpStore = new Map();
 
-// জিমেইল ট্রান্সপোর্টার
+// জিমেইল ট্রান্সপোর্টার (Port 465 ও Timeout ফিক্স সহ)
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,         
+  secure: true,      
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
-  }
+  },
+  // সার্ভার হ্যাং হওয়া আটকাতে টাইমআউট কনফিগারেশন
+  connectionTimeout: 10000, 
+  greetingTimeout: 10000,   
+  socketTimeout: 15000      
 });
 
-// ২. ওটিপি পাঠানোর API
+// ২. ওটিপি পাঠানোর API (Fast Response যুক্ত)
 app.post('/api/send-otp', async (req, res) => {
   const { email } = req.body;
 
@@ -50,12 +56,12 @@ app.post('/api/send-otp', async (req, res) => {
 
   otpStore.set(email, { otp, expiresAt });
 
-  // ক্লাউডিনারি ইমেজ লোগো সহ কাস্টম ডার্ক টেমপ্লেট
+  // AMOLED Black (#000000) লোগো ব্যাকগ্রাউন্ড সহ ডার্ক টেমপ্লেট
   const mailOptions = {
     from: `"MedKarma" <${process.env.EMAIL_USER}>`,
     to: email,
     subject: `${otp} is your MedKarma verification code`,
-    text: `Your MedKarma verification code is: ${otp}. Valid for 5 minutes.`, // জিমেইল নোটিফিকেশনে "Copy code" দ্রুত আসার জন্য
+    text: `Your MedKarma verification code is: ${otp}. Valid for 5 minutes.`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -63,28 +69,26 @@ app.post('/api/send-otp', async (req, res) => {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
       </head>
-      <body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+      <body style="margin: 0; padding: 0; background-color: #000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
         
-        <!-- গোপন প্রি-হেডার: জিমেইলকে দ্রুত ওটিপি ডিটেক্ট করতে সাহায্য করে -->
-        <div style="display: none; font-size: 1px; color: #0f172a; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
+        <div style="display: none; font-size: 1px; color: #000000; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
           Your MedKarma verification code is ${otp}.
         </div>
 
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed;">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; background-color: #000000;">
           <tr>
             <td align="center" style="padding: 40px 10px;">
-              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 500px; background-color: #0a0f1d; border-radius: 16px; border: 1px solid #1e293b; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5); overflow: hidden;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 500px; background-color: #050505; border-radius: 16px; border: 1px solid #1e293b; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8); overflow: hidden;">
                 
-                <!-- Cloudinary আসল লোগো ইমেজ সেকশন -->
+                <!-- Cloudinary লোগো এবং এর পেছনে পিওর AMOLED Black ব্যাকগ্রাউন্ড -->
                 <tr>
-                  <td align="center" style="padding: 35px 20px 20px 20px; background-color: #050811;">
+                  <td align="center" style="padding: 35px 20px 20px 20px; background-color: #000000;">
                     <img src="https://res.cloudinary.com/d4puny67/image/upload/f_auto/q_auto/file_000000005390821190f86576e343b442.png" alt="MedKarma" style="height: 42px; max-width: 220px; width: auto; display: block; border: 0;" />
                   </td>
                 </tr>
 
-                <!-- হেডার ও বর্ণনা -->
                 <tr>
-                  <td style="padding: 25px 35px 15px 35px; text-align: center;">
+                  <td style="padding: 25px 35px 15px 35px; text-align: center; background-color: #050505;">
                     <h2 style="color: #f8fafc; font-size: 20px; font-weight: 700; margin: 0 0 10px 0;">Verify your email address</h2>
                     <p style="color: #94a3b8; font-size: 14px; line-height: 1.6; margin: 0;">
                       Thank you for joining MedKarma. Please enter the verification code below to verify your account and get started.
@@ -92,10 +96,9 @@ app.post('/api/send-otp', async (req, res) => {
                   </td>
                 </tr>
 
-                <!-- OTP বক্স -->
                 <tr>
-                  <td align="center" style="padding: 15px 35px 25px 35px;">
-                    <div style="background-color: #111827; border: 1.5px dashed #38bdf8; border-radius: 14px; padding: 18px 30px; display: inline-block;">
+                  <td align="center" style="padding: 15px 35px 25px 35px; background-color: #050505;">
+                    <div style="background-color: #000000; border: 1.5px dashed #38bdf8; border-radius: 14px; padding: 18px 30px; display: inline-block;">
                       <span style="font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #ffffff; font-family: monospace;">${otp}</span>
                     </div>
                     <p style="color: #64748b; font-size: 13px; font-weight: 500; margin: 12px 0 0 0;">
@@ -104,10 +107,9 @@ app.post('/api/send-otp', async (req, res) => {
                   </td>
                 </tr>
 
-                <!-- সিকিউরিটি নোটিশ -->
                 <tr>
-                  <td style="padding: 0 35px 25px 35px;">
-                    <div style="background-color: #0f172a; border-radius: 8px; padding: 12px 16px; border-left: 4px solid #f59e0b;">
+                  <td style="padding: 0 35px 25px 35px; background-color: #050505;">
+                    <div style="background-color: #000000; border-radius: 8px; padding: 12px 16px; border-left: 4px solid #f59e0b;">
                       <p style="color: #cbd5e1; font-size: 12px; line-height: 1.5; margin: 0;">
                         <strong style="color: #f59e0b;">Security Notice:</strong> Never share this OTP with anyone. MedKarma team members will never ask for your code.
                       </p>
@@ -115,9 +117,8 @@ app.post('/api/send-otp', async (req, res) => {
                   </td>
                 </tr>
 
-                <!-- ফুটার -->
                 <tr>
-                  <td style="padding: 20px 35px 30px 35px; border-top: 1px solid #1e293b; text-align: center;">
+                  <td style="padding: 20px 35px 30px 35px; border-top: 1px solid #1e293b; text-align: center; background-color: #050505;">
                     <p style="color: #64748b; font-size: 12px; margin: 0;">
                       © ${new Date().getFullYear()} MedKarma Inc. All rights reserved.
                     </p>
@@ -133,14 +134,17 @@ app.post('/api/send-otp', async (req, res) => {
     `
   };
 
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`OTP sent successfully to ${email}`);
-    return res.status(200).json({ success: true, message: 'OTP sent successfully' });
-  } catch (error) {
-    console.error('Email sending error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to send OTP' });
-  }
+  // ১. অ্যাপকে সাথে সাথে ফাস্ট রেসপন্স দিয়ে দেওয়া হলো (জিরো লেটেন্সি)
+  res.status(200).json({ success: true, message: 'OTP sending in background' });
+
+  // ২. ব্যাকগ্রাউন্ডে ইমেইল পাঠানো হচ্ছে (অ্যাপকে আর হ্যাং হয়ে ওয়েট করতে হবে না)
+  transporter.sendMail(mailOptions)
+    .then(() => {
+      console.log(`OTP sent successfully to ${email}`);
+    })
+    .catch((error) => {
+      console.error('Background Email sending error:', error.message);
+    });
 });
 
 // ৩. ওটিপি যাচাই ও ফায়ারবেস কাস্টম টোকেন তৈরি
@@ -166,7 +170,6 @@ app.post('/api/verify-otp', async (req, res) => {
   otpStore.delete(email);
 
   try {
-    // ফায়ারবেসে ইউজার আছে কি না চেক করা বা নতুন তৈরি করা
     let userRecord;
     try {
       userRecord = await admin.auth().getUserByEmail(email);
@@ -178,13 +181,12 @@ app.post('/api/verify-otp', async (req, res) => {
       }
     }
 
-    // ফায়ারবেসের অফিশিয়াল কাস্টম টোকেন তৈরি
     const firebaseToken = await admin.auth().createCustomToken(userRecord.uid);
 
     return res.status(200).json({
       success: true,
       message: 'Email verified successfully',
-      firebaseToken: firebaseToken // অ্যান্ড্রয়েড অ্যাপে Firebase-এ লগইন করার চাবি
+      firebaseToken: firebaseToken 
     });
 
   } catch (firebaseErr) {
