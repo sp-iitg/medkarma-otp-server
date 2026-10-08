@@ -27,19 +27,19 @@ app.get('/', (req, res) => {
 // সাময়িক ওটিপি স্টোর (মেমোরি)
 const otpStore = new Map();
 
-// জিমেইল ট্রান্সপোর্টার (Port 465 ও Timeout ফিক্স সহ)
+// জিমেইল ট্রান্সপোর্টার (ENETUNREACH 2404 IPv6 ও Timeout ফিক্স সহ)
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,         
-  secure: true,      
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   },
-  // সার্ভার হ্যাং হওয়া আটকাতে টাইমআউট কনফিগারেশন
-  connectionTimeout: 10000, 
-  greetingTimeout: 10000,   
-  socketTimeout: 15000      
+  family: 4, // শুধুমাত্র IPv4 ব্যবহার করবে (IPv6 Network Unreachable সমাধান)
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 15000
 });
 
 // ২. ওটিপি পাঠানোর API (Fast Response যুক্ত)
@@ -56,7 +56,7 @@ app.post('/api/send-otp', async (req, res) => {
 
   otpStore.set(email, { otp, expiresAt });
 
-  // AMOLED Black (#000000) লোগো ব্যাকগ্রাউন্ড সহ ডার্ক টেমপ্লেট
+  // প্রিমিয়াম ডার্ক টেমপ্লেট: শুধু লোগো হেডারে পিওর ব্ল্যাক এবং নিচে ডিভাইডার বর্ডার
   const mailOptions = {
     from: `"MedKarma" <${process.env.EMAIL_USER}>`,
     to: email,
@@ -69,26 +69,27 @@ app.post('/api/send-otp', async (req, res) => {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
       </head>
-      <body style="margin: 0; padding: 0; background-color: #000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+      <body style="margin: 0; padding: 0; background-color: #0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
         
-        <div style="display: none; font-size: 1px; color: #000000; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
+        <div style="display: none; font-size: 1px; color: #0b0f19; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
           Your MedKarma verification code is ${otp}.
         </div>
 
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; background-color: #000000;">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; background-color: #0b0f19;">
           <tr>
             <td align="center" style="padding: 40px 10px;">
-              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 500px; background-color: #050505; border-radius: 16px; border: 1px solid #1e293b; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8); overflow: hidden;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 500px; background-color: #0f172a; border-radius: 16px; border: 1px solid #1e293b; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6); overflow: hidden;">
                 
-                <!-- Cloudinary লোগো এবং এর পেছনে পিওর AMOLED Black ব্যাকগ্রাউন্ড -->
+                <!-- লোগো হেডার সেকশন (শুধু এখানেই পিওর AMOLED Black এবং নিচে সেপারেটর বর্ডার) -->
                 <tr>
-                  <td align="center" style="padding: 35px 20px 20px 20px; background-color: #000000;">
+                  <td align="center" style="padding: 32px 20px 24px 20px; background-color: #000000; border-bottom: 1px solid #1e293b;">
                     <img src="https://res.cloudinary.com/d4puny67/image/upload/f_auto/q_auto/file_000000005390821190f86576e343b442.png" alt="MedKarma" style="height: 42px; max-width: 220px; width: auto; display: block; border: 0;" />
                   </td>
                 </tr>
 
+                <!-- কার্ড বডি / টেক্সট এরিয়া -->
                 <tr>
-                  <td style="padding: 25px 35px 15px 35px; text-align: center; background-color: #050505;">
+                  <td style="padding: 28px 35px 15px 35px; text-align: center;">
                     <h2 style="color: #f8fafc; font-size: 20px; font-weight: 700; margin: 0 0 10px 0;">Verify your email address</h2>
                     <p style="color: #94a3b8; font-size: 14px; line-height: 1.6; margin: 0;">
                       Thank you for joining MedKarma. Please enter the verification code below to verify your account and get started.
@@ -96,9 +97,10 @@ app.post('/api/send-otp', async (req, res) => {
                   </td>
                 </tr>
 
+                <!-- OTP বক্স -->
                 <tr>
-                  <td align="center" style="padding: 15px 35px 25px 35px; background-color: #050505;">
-                    <div style="background-color: #000000; border: 1.5px dashed #38bdf8; border-radius: 14px; padding: 18px 30px; display: inline-block;">
+                  <td align="center" style="padding: 15px 35px 25px 35px;">
+                    <div style="background-color: #0a0f1d; border: 1.5px dashed #38bdf8; border-radius: 14px; padding: 18px 32px; display: inline-block;">
                       <span style="font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #ffffff; font-family: monospace;">${otp}</span>
                     </div>
                     <p style="color: #64748b; font-size: 13px; font-weight: 500; margin: 12px 0 0 0;">
@@ -107,9 +109,10 @@ app.post('/api/send-otp', async (req, res) => {
                   </td>
                 </tr>
 
+                <!-- সিকিউরিটি নোটিশ -->
                 <tr>
-                  <td style="padding: 0 35px 25px 35px; background-color: #050505;">
-                    <div style="background-color: #000000; border-radius: 8px; padding: 12px 16px; border-left: 4px solid #f59e0b;">
+                  <td style="padding: 0 35px 25px 35px;">
+                    <div style="background-color: #0a0f1d; border-radius: 8px; padding: 12px 16px; border-left: 4px solid #f59e0b;">
                       <p style="color: #cbd5e1; font-size: 12px; line-height: 1.5; margin: 0;">
                         <strong style="color: #f59e0b;">Security Notice:</strong> Never share this OTP with anyone. MedKarma team members will never ask for your code.
                       </p>
@@ -117,8 +120,9 @@ app.post('/api/send-otp', async (req, res) => {
                   </td>
                 </tr>
 
+                <!-- ফুটার -->
                 <tr>
-                  <td style="padding: 20px 35px 30px 35px; border-top: 1px solid #1e293b; text-align: center; background-color: #050505;">
+                  <td style="padding: 20px 35px 30px 35px; border-top: 1px solid #1e293b; text-align: center;">
                     <p style="color: #64748b; font-size: 12px; margin: 0;">
                       © ${new Date().getFullYear()} MedKarma Inc. All rights reserved.
                     </p>
@@ -134,10 +138,10 @@ app.post('/api/send-otp', async (req, res) => {
     `
   };
 
-  // ১. অ্যাপকে সাথে সাথে ফাস্ট রেসপন্স দিয়ে দেওয়া হলো (জিরো লেটেন্সি)
+  // ১. অ্যাপকে সাথে সাথে ফাস্ট রেসপন্স প্রদান
   res.status(200).json({ success: true, message: 'OTP sending in background' });
 
-  // ২. ব্যাকগ্রাউন্ডে ইমেইল পাঠানো হচ্ছে (অ্যাপকে আর হ্যাং হয়ে ওয়েট করতে হবে না)
+  // ২. ব্যাকগ্রাউন্ডে ইমেইল সেন্ডিং (IPv4 কানেকশনে)
   transporter.sendMail(mailOptions)
     .then(() => {
       console.log(`OTP sent successfully to ${email}`);
@@ -166,7 +170,6 @@ app.post('/api/verify-otp', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid OTP' });
   }
 
-  // ওটিপি ভেরিফাইড! মেমোরি থেকে মুছে ফেলা হলো
   otpStore.delete(email);
 
   try {
