@@ -27,21 +27,21 @@ app.get('/', (req, res) => {
 // সাময়িক ওটিপি স্টোর (মেমোরি)
 const otpStore = new Map();
 
-// জিমেইল ট্রান্সপোর্টার (ENETUNREACH 2404 IPv6 ও Timeout ফিক্স সহ)
+// জিমেইল ট্রান্সপোর্টার (Port 587 + STARTTLS + IPv4 + TLS ফিক্স)
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
-  secure: false,
+  secure: false, // Port 587-এর জন্য false (STARTTLS হ্যান্ডশেক করবে)
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   },
-  family: 4, // শুধুমাত্র IPv4 ব্যবহার করবে (IPv6 Network Unreachable সমাধান)
-  connectionTimeout: 20000,
+  family: 4, // শুধুমাত্র IPv4 ব্যবহার করবে (ENETUNREACH IPv6 ফিক্স)
+  connectionTimeout: 20000, // ২০ সেকেন্ড হ্যান্ডশেক বাফার
   greetingTimeout: 20000,
-  socketTimeout: 25000
+  socketTimeout: 25000,
   tls: {
-    rejectUnauthorized: false // ক্লাউড প্রক্সির সেলফ-সাইন সার্টিফিকেট জনিত ব্লকিং আটকাবে
+    rejectUnauthorized: false // ক্লাউড প্রক্সি বা সেলফ-সাইন সার্টিফিকেট ব্লকিং আটকাবে
   }
 });
 
@@ -59,7 +59,7 @@ app.post('/api/send-otp', async (req, res) => {
 
   otpStore.set(email, { otp, expiresAt });
 
-  // প্রিমিয়াম ডার্ক টেমপ্লেট: শুধু লোগো হেডারে পিওর ব্ল্যাক এবং নিচে ডিভাইডার বর্ডার
+  // প্রফেশনাল ডার্ক টেমপ্লেট: শুধু লোগো হেডারে পিওর ব্ল্যাক এবং নিচে ডিভাইডার বর্ডার
   const mailOptions = {
     from: `"MedKarma" <${process.env.EMAIL_USER}>`,
     to: email,
@@ -83,14 +83,14 @@ app.post('/api/send-otp', async (req, res) => {
             <td align="center" style="padding: 40px 10px;">
               <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 500px; background-color: #0f172a; border-radius: 16px; border: 1px solid #1e293b; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6); overflow: hidden;">
                 
-                <!-- লোগো হেডার সেকশন (শুধু এখানেই পিওর AMOLED Black এবং নিচে সেপারেটর বর্ডার) -->
+                <!-- লোগো হেডার সেকশন (পিওর AMOLED Black এবং সেপারেটর বর্ডার) -->
                 <tr>
                   <td align="center" style="padding: 32px 20px 24px 20px; background-color: #000000; border-bottom: 1px solid #1e293b;">
                     <img src="https://res.cloudinary.com/d4puny67/image/upload/f_auto/q_auto/file_000000005390821190f86576e343b442.png" alt="MedKarma" style="height: 42px; max-width: 220px; width: auto; display: block; border: 0;" />
                   </td>
                 </tr>
 
-                <!-- কার্ড বডি / টেক্সট এরিয়া -->
+                <!-- কার্ড বডি -->
                 <tr>
                   <td style="padding: 28px 35px 15px 35px; text-align: center;">
                     <h2 style="color: #f8fafc; font-size: 20px; font-weight: 700; margin: 0 0 10px 0;">Verify your email address</h2>
@@ -141,10 +141,10 @@ app.post('/api/send-otp', async (req, res) => {
     `
   };
 
-  // ১. অ্যাপকে সাথে সাথে ফাস্ট রেসপন্স প্রদান
+  // ১. অ্যাপে তাৎক্ষণিক ফাস্ট রেসপন্স প্রদান
   res.status(200).json({ success: true, message: 'OTP sending in background' });
 
-  // ২. ব্যাকগ্রাউন্ডে ইমেইল সেন্ডিং (IPv4 কানেকশনে)
+  // ২. ব্যাকগ্রাউন্ডে ইমেইল পাঠানো
   transporter.sendMail(mailOptions)
     .then(() => {
       console.log(`OTP sent successfully to ${email}`);
