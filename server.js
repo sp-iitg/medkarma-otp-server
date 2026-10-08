@@ -30,16 +30,19 @@ const otpStore = new Map();
 // জিমেইল ট্রান্সপোর্টার (ENETUNREACH 2404 IPv6 ও Timeout ফিক্স সহ)
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
+  port: 587,
+  secure: false,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   },
   family: 4, // শুধুমাত্র IPv4 ব্যবহার করবে (IPv6 Network Unreachable সমাধান)
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 15000
+  connectionTimeout: 20000,
+  greetingTimeout: 20000,
+  socketTimeout: 25000
+  tls: {
+    rejectUnauthorized: false // ক্লাউড প্রক্সির সেলফ-সাইন সার্টিফিকেট জনিত ব্লকিং আটকাবে
+  }
 });
 
 // ২. ওটিপি পাঠানোর API (Fast Response যুক্ত)
