@@ -3,26 +3,29 @@ const express = require('express');
 const { Resend } = require('resend');
 const cors = require('cors');
 
-// Node.js আধুনিক ভার্সনের জন্য নিরাপদ Firebase Admin ইমপোর্ট
-const adminPackage = require('firebase-admin');
-const admin = adminPackage.default || adminPackage;
-const { cert } = require('firebase-admin/app');
+// Firebase Admin SDK-এর সঠিক ও আধুনিক ইমপোর্ট
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
 
-// Firebase Admin SDK ইনিশিয়ালাইজেশন
+// Service Account Key লোড করা
 const serviceAccount = require('./serviceAccountKey.json');
 
-admin.initializeApp({
+// Firebase App ইনিশিয়ালাইজেশন
+const firebaseApp = initializeApp({
   credential: cert(serviceAccount)
 });
+
+// সরাসরি Auth ইন্সট্যান্স নেওয়া (admin.auth is not a function ফিক্স)
+const auth = getAuth(firebaseApp);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Resend ইনিশিয়ালাইজেশন (.env থেকে API Key নেবে)
+// Resend ইনিশিয়ালাইজেশন
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// ১. সার্ভার সজাগ ও পিং রাখার রুট (ক্রন-জব ও ব্রাউজারের জন্য)
+// ১. সার্ভার সজাগ ও পিং রাখার রুট
 app.get('/', (req, res) => {
   res.status(200).send('MedKarma Server is Running Live!');
 });
@@ -30,7 +33,7 @@ app.get('/', (req, res) => {
 // সাময়িক ওটিপি স্টোর (মেমোরি)
 const otpStore = new Map();
 
-// ২. ওটিপি পাঠানোর API (অ্যাপের রিকোয়েস্ট ও রেসপন্স ফরম্যাট ১০০% অপরিবর্তিত)
+// ২. ওটিপি পাঠানোর API (কাস্টম ডোমেন + Non-Replyable)
 app.post('/api/send-otp', async (req, res) => {
   const { email } = req.body;
 
@@ -44,7 +47,7 @@ app.post('/api/send-otp', async (req, res) => {
 
   otpStore.set(email, { otp, expiresAt });
 
-  // প্রিমিয়াম ডার্ক টেমপ্লেট: লোগো হেডারে পিওর AMOLED Black এবং নিচে ডিভাইডার বর্ডার
+  // ডার্ক টেমপ্লেট
   const emailHtml = `
     <!DOCTYPE html>
     <html>
@@ -63,7 +66,7 @@ app.post('/api/send-otp', async (req, res) => {
           <td align="center" style="padding: 40px 10px;">
             <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 500px; background-color: #0f172a; border-radius: 16px; border: 1px solid #1e293b; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6); overflow: hidden;">
               
-              <!-- লোগো হেডার সেকশন (পিওর AMOLED Black এবং সেপারেটর বর্ডার) -->
+              <!-- লোগো হেডার সেকশন -->
               <tr>
                 <td align="center" style="padding: 32px 20px 24px 20px; background-color: #000000; border-bottom: 1px solid #1e293b;">
                   <img src="https://res.cloudinary.com/d4puny67/image/upload/f_auto/q_auto/file_000000005390821190f86576e343b442.png" alt="MedKarma" style="height: 42px; max-width: 220px; width: auto; display: block; border: 0;" />
@@ -103,7 +106,7 @@ app.post('/api/send-otp', async (req, res) => {
                 </td>
               </tr>
 
-              <!-- ফুটার (Non-Replyable Notice সহ) -->
+              <!-- ফুটার -->
               <tr>
                 <td style="padding: 20px 35px 30px 35px; border-top: 1px solid #1e293b; text-align: center;">
                   <p style="color: #475569; font-size: 11px; margin: 0 0 8px 0;">
@@ -123,20 +126,20 @@ app.post('/api/send-otp', async (req, res) => {
     </html>
   `;
 
-  // ১. অ্যাপকে সাথে সাথে আগের ফরম্যাটেই ফাস্ট রেসপন্স দিয়ে দেওয়া হলো
+  // অ্যাপকে সাথে সাথে ফাস্ট রেসপন্স
   res.status(200).json({ success: true, message: 'OTP sent successfully' });
 
-  // ২. ব্যাকগ্রাউন্ডে কাস্টম ডোমেন থেকে Non-Replyable ওটিপি পাঠানো হচ্ছে
+  // ব্যাকগ্রাউন্ডে Resend দিয়ে ইমেইল সেন্ড
   try {
     const { data, error } = await resend.emails.send({
       from: 'MedKarma <verify@medkarma.in>',
-      replyTo: 'no-reply@medkarma.in', // কেউ রিপ্লাই করতে চাইলে এই নো-রিপ্লাই ঠিকানায় চলে যাবে
+      replyTo: 'no-reply@medkarma.in',
       to: [email],
       subject: `${otp} is your MedKarma verification code`,
       text: `Your MedKarma verification code is: ${otp}. Valid for 5 minutes. Please do not reply to this automated email.`,
       html: emailHtml,
       headers: {
-        'X-Auto-Response-Suppress': 'All', // অটো-রিপ্লাই সম্পূর্ণ ব্লক রাখবে
+        'X-Auto-Response-Suppress': 'All',
         'Auto-Submitted': 'auto-generated'
       }
     });
@@ -151,7 +154,7 @@ app.post('/api/send-otp', async (req, res) => {
   }
 });
 
-// ৩. ওটিপি যাচাই ও ফায়ারবেস কাস্টম টোকেন তৈরি (টোকেন সফল হলে তবেই ওটিপি ডিলিট হবে)
+// ৩. ওটিপি যাচাই ও ফায়ারবেস কাস্টম টোকেন তৈরি (getAuth দিয়ে ফিক্সড)
 app.post('/api/verify-otp', async (req, res) => {
   const { email, otp } = req.body;
 
@@ -173,19 +176,20 @@ app.post('/api/verify-otp', async (req, res) => {
   try {
     let userRecord;
     try {
-      userRecord = await admin.auth().getUserByEmail(email);
+      // সরাসরি auth ইন্সট্যান্স ব্যবহার করা হচ্ছে
+      userRecord = await auth.getUserByEmail(email);
     } catch (err) {
       if (err.code === 'auth/user-not-found') {
-        userRecord = await admin.auth().createUser({ email: email });
+        userRecord = await auth.createUser({ email: email });
       } else {
         throw err;
       }
     }
 
-    // ফায়ারবেস কাস্টম টোকেন তৈরি
-    const firebaseToken = await admin.auth().createCustomToken(userRecord.uid);
+    // ফায়ারবেস কাস্টম টোকেন জেনারেট করা
+    const firebaseToken = await auth.createCustomToken(userRecord.uid);
 
-    // টোকেন সফলভাবে তৈরি হওয়ার পর মেমোরি থেকে ওটিপি মুছবে
+    // টোকেন সফলভাবে তৈরি হলেই ওটিপি ডিলিট হবে
     otpStore.delete(email);
 
     return res.status(200).json({
@@ -195,7 +199,6 @@ app.post('/api/verify-otp', async (req, res) => {
     });
 
   } catch (firebaseErr) {
-    // Render Logs-এ আসল ফায়ারবেস এররটি দেখাবে
     console.error('Firebase Auth Detailed Error:', firebaseErr);
     return res.status(500).json({ 
       success: false, 
