@@ -151,7 +151,7 @@ app.post('/api/send-otp', async (req, res) => {
   }
 });
 
-// ৩. ওটিপি যাচাই ও ফায়ারবেস কাস্টম টোকেন তৈরি (হুবহু আগের মতোই অপরিবর্তিত)
+// ৩. ওটিপি যাচাই ও ফায়ারবেস কাস্টম টোকেন তৈরি (টোকেন সফল হলে তবেই ওটিপি ডিলিট হবে)
 app.post('/api/verify-otp', async (req, res) => {
   const { email, otp } = req.body;
 
@@ -170,8 +170,6 @@ app.post('/api/verify-otp', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid OTP' });
   }
 
-  otpStore.delete(email);
-
   try {
     let userRecord;
     try {
@@ -184,7 +182,11 @@ app.post('/api/verify-otp', async (req, res) => {
       }
     }
 
+    // ফায়ারবেস কাস্টম টোকেন তৈরি
     const firebaseToken = await admin.auth().createCustomToken(userRecord.uid);
+
+    // টোকেন সফলভাবে তৈরি হওয়ার পর মেমোরি থেকে ওটিপি মুছবে
+    otpStore.delete(email);
 
     return res.status(200).json({
       success: true,
@@ -193,8 +195,12 @@ app.post('/api/verify-otp', async (req, res) => {
     });
 
   } catch (firebaseErr) {
-    console.error('Firebase Auth error:', firebaseErr);
-    return res.status(500).json({ success: false, message: 'Failed to create Firebase token' });
+    // Render Logs-এ আসল ফায়ারবেস এররটি দেখাবে
+    console.error('Firebase Auth Detailed Error:', firebaseErr);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Failed to create Firebase token' 
+    });
   }
 });
 
